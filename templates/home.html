@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Truck Activity Prediction</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        .container { width: 80%; margin: auto; }
+        #activity-bar { width: 100%; height: 30px; background-color: #ddd; position: fixed; top: 0; left: 0; }
+        .segment { height: 100%; display: inline-block; }
+        table { width: 100%; border-collapse: collapse; margin-top: 40px; }
+        th, td { border: 1px solid #ddd; padding: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Real-Time Truck Activity Prediction</h2>
+        <input type="file" id="fileInput">
+        <button onclick="uploadFile()">Upload</button>
+        <h3>Predicted Activities</h3>
+        <table id="predictionTable">
+            <tr><th>Time (s)</th><th>Predicted Activity</th></tr>
+        </table>
+    </div>
+    <div id="activity-bar"></div>
+    <script>
+        function uploadFile() {
+            let file = document.getElementById('fileInput').files[0];
+            let formData = new FormData();
+            formData.append("file", file);
+            fetch("/upload", { method: "POST", body: formData })
+                .then(response => response.json())
+                .then(data => console.log(data));
+        }
+        function updatePredictions() {
+            fetch("/get_predictions")
+                .then(response => response.json())
+                .then(data => {
+                    let table = document.getElementById("predictionTable");
+                    table.innerHTML = "<tr><th>Time (s)</th><th>Predicted Activity</th></tr>";
+                    document.getElementById("activity-bar").innerHTML = "";
+                    let totalTime = data.total_time;
+                    data.predictions.forEach(info => {
+                        let row = table.insertRow();
+                        row.insertCell(0).innerText = info.Time;
+                        row.insertCell(1).innerText = info.Activity;
+                        let segment = document.createElement("div");
+                        segment.classList.add("segment");
+                        segment.style.width = (info.Time / totalTime * 100) + "%";
+                        segment.style.backgroundColor = getColor(info.Activity);
+                        document.getElementById("activity-bar").appendChild(segment);
+                    });
+                });
+        }
+        function getColor(activity) {
+            return activity === "Loading" ? "green" : activity === "Hauling" ? "blue" : activity === "Dumping" ? "red" : "gray";
+        }
+        setInterval(updatePredictions, 10000);
+    </script>
+</body>
+</html>
