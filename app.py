@@ -1,59 +1,68 @@
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
+import time
+import threading
+import eventlet
 import os
-import joblib  # For loading ML models
-from werkzeug.utils import secure_filename
+from flask_socketio import SocketIO
+import joblib
+
+eventlet.monkey_patch()
 
 app = Flask(__name__)
+socketio = SocketIO(app, async_mode='eventlet')
 
-# Define upload folder
-UPLOAD_FOLDER = "uploads"
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+# Load trained model
+model = joblib.load("model.pkl")  # Ensure your trained model is saved as model.pkl
 
-# Ensure the uploads folder exists
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+# Activity time tracking
+activity_time = {"Loading": 0, "Dumping": 0, "Idling": 0, "Hauling": 0}
+time_interval = 10  # Each data point represents 10 seconds
 
-# Load the pre-trained model
-model = joblib.load("model.pkl")  # Replace with your trained model
+uploaded_file_path = None
 
+@app.route('/')
+def index():
+    return render_template('home.html')
 
-def predict_activity(file_path):
-    df = pd.read_csv(file_path)
-
-    # ✅ Automatically generate a mock 'time' column assuming 10s intervals
-    df["time"] = pd.to_datetime(pd.Series(range(0, len(df) * 10, 10)), unit="s")
-
-    # ✅ Debugging: Print first few rows to verify
-    print(df.head())
-
-    # Perform the activity prediction (Replace this with your ML model)
-    predicted_activities = ["loading", "hauling", "unloading", "idling"]  # Dummy example
-    activity_summary = {activity: df.sample(n=5).index.tolist() for activity in predicted_activities}
-
-    return activity_summary
-
-@app.route("/", methods=["GET", "POST"])
-def home():
-    return render_template("home.html")
-
-@app.route("/upload", methods=["POST"])
+@app.route('/upload', methods=['POST'])
 def upload_file():
-    if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-
-    file = request.files["file"]
-    if file.filename == "":
+    global uploaded_file_path
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
 
-    filename = secure_filename(file.filename)
-    file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    file_path = os.path.join("uploads", file.filename)
+    os.makedirs("uploads", exist_ok=True)
     file.save(file_path)
+    uploaded_file_path = file_path
 
-    # Predict activity and get summary
-    activity_summary = predict_activity(file_path)
+    threading.Thread(target=process_file, args=(file_path,)).start()
+    return jsonify({"message": "File uploaded and processing started"}), 200
 
-    return jsonify({"activity_summary": activity_summary})
+def process_file(file_path):
+    global activity_time
+    df = pd.read_csv(file_path)
 
-if __name__ == "__main__":
-    app.run(debug=True)
+    for _, row in df.iterrows():
+        features = row.drop(["Unnamed: 0"])  # Drop unnecessary columns
+        prediction = model.predict([features])[0]  # Predict activity
+
+        # Update activity time
+        activity_time[prediction] += time_interval / 60  # Convert to minutes
+
+        # Send update to frontend
+        socketio.emit('update', {'activity': prediction, 'activity_time': activity_time})
+        time.sleep(10)  # Simulating real-time delay
+
+@app.route('/reset', methods=['POST'])
+def reset():
+    global activity_time
+    activity_time = {"Loading": 0, "Dumping": 0, "Idling": 0, "Hauling": 0}
+    return jsonify({"message": "Activity time reset"}), 200
+
+if __name__ == '__main__':
+    socketio.run(app, debug=True)
