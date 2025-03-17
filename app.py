@@ -6,8 +6,13 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
+# Define upload folder
 UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+# Ensure the uploads folder exists
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
 # Load the pre-trained model
 model = joblib.load("model.pkl")  # Replace with your trained model
