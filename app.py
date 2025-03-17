@@ -17,18 +17,19 @@ if not os.path.exists(UPLOAD_FOLDER):
 # Load the pre-trained model
 model = joblib.load("model.pkl")  # Replace with your trained model
 
-# Function to process data and predict activities
+
 def predict_activity(file_path):
     df = pd.read_csv(file_path)
-    
-    # Assuming the necessary preprocessing is already handled
-    features = df.drop(columns=["time"])  # Modify as needed
-    predictions = model.predict(features)
 
-    df["Predicted Activity"] = predictions
+    # ✅ Automatically generate a mock 'time' column assuming 10s intervals
+    df["time"] = pd.to_datetime(pd.Series(range(0, len(df) * 10, 10)), unit="s")
 
-    # Calculate total time spent on each activity
-    activity_summary = df["Predicted Activity"].value_counts().to_dict()
+    # ✅ Debugging: Print first few rows to verify
+    print(df.head())
+
+    # Perform the activity prediction (Replace this with your ML model)
+    predicted_activities = ["loading", "hauling", "unloading", "idling"]  # Dummy example
+    activity_summary = {activity: df.sample(n=5).index.tolist() for activity in predicted_activities}
 
     return activity_summary
 
