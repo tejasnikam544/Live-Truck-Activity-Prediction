@@ -5,6 +5,3 @@ numpy
 matplotlib
 ipykernel
 seaborn
-eventlet
-flask_socketio
-joblib
