@@ -5,3 +5,4 @@ numpy
 matplotlib
 ipykernel
 seaborn
+eventlet
