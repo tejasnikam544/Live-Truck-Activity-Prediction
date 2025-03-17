@@ -4,94 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Truck Activity Prediction</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.3/socket.io.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-        }
-        .container {
-            width: 50%;
-            margin: auto;
-        }
-        .activity-box {
-            display: inline-block;
-            width: 150px;
-            height: 150px;
-            margin: 10px;
-            padding: 20px;
-            text-align: center;
-            font-size: 20px;
-            font-weight: bold;
-            border-radius: 10px;
-            background-color: #f0f0f0;
-        }
-        .loading { background-color: #ffcc00; }
-        .dumping { background-color: #ff5733; }
-        .idling { background-color: #33b5e5; }
-        .hauling { background-color: #4caf50; }
-    </style>
-</head>
-<body>
-
-    <h1>Truck Activity Prediction</h1>
-    <input type="file" id="fileInput">
-    <button onclick="uploadFile()">Upload</button>
-    <button onclick="resetData()">Reset</button>
-    
-    <h2>Current Activity: <span id="currentActivity">Waiting...</span></h2>
-
-    <div class="container">
-        <div class="activity-box loading">Loading: <span id="loadingTime">0</span> min</div>
-        <div class="activity-box dumping">Dumping: <span id="dumpingTime">0</span> min</div>
-        <div class="activity-box idling">Idling: <span id="idlingTime">0</span> min</div>
-        <div class="activity-box hauling">Hauling: <span id="haulingTime">0</span> min</div>
-    </div>
-
     <script>
-        var socket = io();
-
-        function uploadFile() {
-            let fileInput = document.getElementById('fileInput').files[0];
-            if (!fileInput) {
-                alert("Please select a file");
-                return;
-            }
-
-            let formData = new FormData();
-            formData.append("file", fileInput);
-
-            fetch('/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => alert(data.message))
-            .catch(error => console.error('Error:', error));
-        }
-
-        function resetData() {
-            fetch('/reset', { method: 'POST' })
+        function fetchPrediction() {
+            fetch('/predict')
                 .then(response => response.json())
                 .then(data => {
-                    alert(data.message);
-                    document.getElementById("loadingTime").innerText = "0";
-                    document.getElementById("dumpingTime").innerText = "0";
-                    document.getElementById("idlingTime").innerText = "0";
-                    document.getElementById("haulingTime").innerText = "0";
-                    document.getElementById("currentActivity").innerText = "Waiting...";
-                })
-                .catch(error => console.error('Error:', error));
+                    document.getElementById("activity").innerText = "Current Activity: " + data.activity;
+                    document.getElementById("loading-time").innerText = "Loading Time: " + data.time_spent.Loading + " sec";
+                    document.getElementById("hauling-time").innerText = "Hauling Time: " + data.time_spent.Hauling + " sec";
+                    document.getElementById("unloading-time").innerText = "Unloading Time: " + data.time_spent.Unloading + " sec";
+                    document.getElementById("idling-time").innerText = "Idling Time: " + data.time_spent.Idling + " sec";
+                });
         }
 
-        socket.on('update', function(data) {
-            document.getElementById("currentActivity").innerText = data.activity;
-            document.getElementById("loadingTime").innerText = data.activity_time["Loading"];
-            document.getElementById("dumpingTime").innerText = data.activity_time["Dumping"];
-            document.getElementById("idlingTime").innerText = data.activity_time["Idling"];
-            document.getElementById("haulingTime").innerText = data.activity_time["Hauling"];
-        });
+        setInterval(fetchPrediction, 5000);  // Refresh data every 5 seconds
     </script>
-
+</head>
+<body>
+    <h1>Truck Activity Prediction</h1>
+    <h2 id="activity">Current Activity: Waiting</h2>
+    <h3 id="loading-time">Loading Time: 0 sec</h3>
+    <h3 id="hauling-time">Hauling Time: 0 sec</h3>
+    <h3 id="unloading-time">Unloading Time: 0 sec</h3>
+    <h3 id="idling-time">Idling Time: 0 sec</h3>
 </body>
 </html>

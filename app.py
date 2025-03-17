@@ -1,69 +1,51 @@
-import eventlet
-eventlet.monkey_patch()
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, jsonify
 import pandas as pd
 import time
 import threading
-import os
-from flask_socketio import SocketIO
-import joblib
-
-eventlet.monkey_patch()
+import joblib  # Load trained model
 
 app = Flask(__name__)
-socketio = SocketIO(app, async_mode='eventlet')
 
-# Load trained model
-model = joblib.load("model.pkl")  # Ensure your trained model is saved as model.pkl
+# Load the trained model
+model = joblib.load("model.pkl")  # Ensure the correct model file is provided
+df = pd.read_csv("data.csv")  # Load dataset
+df = df.drop(columns=["Unnamed: 0"], errors="ignore")  # Drop unnecessary columns
 
-# Activity time tracking
-activity_time = {"Loading": 0, "Dumping": 0, "Idling": 0, "Hauling": 0}
-time_interval = 10  # Each data point represents 10 seconds
+# Initialize variables
+current_index = 0
+prediction_result = {"activity": "Waiting", "time_spent": {"Loading": 0, "Hauling": 0, "Unloading": 0, "Idling": 0}}
+lock = threading.Lock()
 
-uploaded_file_path = None
+def update_prediction():
+    global current_index, prediction_result
+    while True:
+        with lock:
+            if current_index < len(df):
+                row = df.iloc[current_index]
+                features = row.to_numpy().reshape(1, -1)  # Convert row to numpy array
+                activity = model.predict(features)[0]  # Predict activity
 
-@app.route('/')
-def index():
-    return render_template('home.html')
+                # Update time spent
+                prediction_result["activity"] = activity
+                prediction_result["time_spent"][activity] += 10  # Increment time (10 sec interval)
 
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    global uploaded_file_path
-    if 'file' not in request.files:
-        return jsonify({"error": "No file part"}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
+                current_index += 1
+            else:
+                prediction_result["activity"] = "Completed"
 
-    file_path = os.path.join("uploads", file.filename)
-    os.makedirs("uploads", exist_ok=True)
-    file.save(file_path)
-    uploaded_file_path = file_path
+        time.sleep(10)  # Mock real-time prediction (10 sec interval)
 
-    threading.Thread(target=process_file, args=(file_path,)).start()
-    return jsonify({"message": "File uploaded and processing started"}), 200
+# Run the prediction in a separate thread
+threading.Thread(target=update_prediction, daemon=True).start()
 
-def process_file(file_path):
-    global activity_time
-    df = pd.read_csv(file_path)
+@app.route("/")
+def home():
+    return render_template("home.html")
 
-    for _, row in df.iterrows():
-        features = row.drop(["Unnamed: 0"])  # Drop unnecessary columns
-        prediction = model.predict([features])[0]  # Predict activity
+@app.route("/predict")
+def predict():
+    with lock:
+        return jsonify(prediction_result)
 
-        # Update activity time
-        activity_time[prediction] += time_interval / 60  # Convert to minutes
-
-        # Send update to frontend
-        socketio.emit('update', {'activity': prediction, 'activity_time': activity_time})
-        time.sleep(10)  # Simulating real-time delay
-
-@app.route('/reset', methods=['POST'])
-def reset():
-    global activity_time
-    activity_time = {"Loading": 0, "Dumping": 0, "Idling": 0, "Hauling": 0}
-    return jsonify({"message": "Activity time reset"}), 200
-
-if __name__ == '__main__':
-    socketio.run(app, debug=True)
+if __name__ == "__main__":
+    app.run(debug=True)
