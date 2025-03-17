@@ -1,8 +1,9 @@
+import eventlet
+eventlet.monkey_patch()
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import time
 import threading
-import eventlet
 import os
 from flask_socketio import SocketIO
 import joblib
