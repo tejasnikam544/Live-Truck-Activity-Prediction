@@ -3,41 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Truck Activity Prediction</title>
-    <script>
-        function sendData() {
-            let formData = {};
-            document.querySelectorAll("input").forEach(input => {
-                formData[input.name] = parseFloat(input.value);
-            });
-
-            fetch('/predict', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById("result").innerText = "Predicted Activity: " + data.activity;
-            });
+    <title>Real-Time Truck Activity Prediction</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        .container { width: 80%; margin: auto; }
+        .activity-boxes { display: flex; justify-content: space-around; margin-top: 20px; }
+        .box {
+            width: 22%;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            text-align: center;
         }
-    </script>
+        .loading { background-color: green; }
+        .hauling { background-color: blue; }
+        .dumping { background-color: red; }
+        .idling { background-color: gray; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    </style>
 </head>
 <body>
-    <h1>Truck Activity Prediction</h1>
-    <form onsubmit="event.preventDefault(); sendData();">
-        <label for="feature1">Feature 1:</label>
-        <input type="number" id="feature1" name="feature1" required><br><br>
+    <div class="container">
+        <h2>Real-Time Truck Activity Prediction</h2>
+        <input type="file" id="fileInput">
+        <button onclick="uploadFile()">Upload</button>
+        
+        <div class="activity-boxes">
+            <div class="box loading">Loading Time: <span id="loading-time">0</span> min</div>
+            <div class="box hauling">Hauling Time: <span id="hauling-time">0</span> min</div>
+            <div class="box dumping">Dumping Time: <span id="dumping-time">0</span> min</div>
+            <div class="box idling">Idling Time: <span id="idling-time">0</span> min</div>
+        </div>
 
-        <label for="feature2">Feature 2:</label>
-        <input type="number" id="feature2" name="feature2" required><br><br>
+        <h3>Predicted Activities</h3>
+        <table id="predictionTable">
+            <tr><th>Time (s)</th><th>Predicted Activity</th></tr>
+        </table>
+    </div>
 
-        <label for="feature3">Feature 3:</label>
-        <input type="number" id="feature3" name="feature3" required><br><br>
+    <script>
+        function uploadFile() {
+            let file = document.getElementById('fileInput').files[0];
+            let formData = new FormData();
+            formData.append("file", file);
+            fetch("/upload", { method: "POST", body: formData })
+                .then(response => response.json())
+                .then(data => console.log(data));
+        }
 
-        <button type="submit">Predict</button>
-    </form>
+        function updatePredictions() {
+            fetch("/get_predictions")
+                .then(response => response.json())
+                .then(data => {
+                    let table = document.getElementById("predictionTable");
+                    table.innerHTML = "<tr><th>Time (s)</th><th>Predicted Activity</th></tr>";
 
-    <h2 id="result">Predicted Activity: </h2>
+                    let loadingTime = 0, haulingTime = 0, dumpingTime = 0, idlingTime = 0;
+
+                    data.predictions.forEach(info => {
+                        let row = table.insertRow();
+                        row.insertCell(0).innerText = info.Time;
+                        row.insertCell(1).innerText = info.Activity;
+
+                        // Increment total time based on activity
+                        if (info.Activity === "Loading") loadingTime += 10;
+                        else if (info.Activity === "Hauling") haulingTime += 10;
+                        else if (info.Activity === "Dumping") dumpingTime += 10;
+                        else if (info.Activity === "Idling") idlingTime += 10;
+                    });
+
+                    // Convert time to minutes and update boxes
+                    document.getElementById("loading-time").innerText = (loadingTime / 60).toFixed(1);
+                    document.getElementById("hauling-time").innerText = (haulingTime / 60).toFixed(1);
+                    document.getElementById("dumping-time").innerText = (dumpingTime / 60).toFixed(1);
+                    document.getElementById("idling-time").innerText = (idlingTime / 60).toFixed(1);
+                });
+        }
+
+        setInterval(updatePredictions, 10000);
+    </script>
 </body>
 </html>
