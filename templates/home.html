@@ -5,27 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Truck Activity Prediction</title>
     <script>
-        function fetchPrediction() {
-            fetch('/predict')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById("activity").innerText = "Current Activity: " + data.activity;
-                    document.getElementById("loading-time").innerText = "Loading Time: " + data.time_spent.Loading + " sec";
-                    document.getElementById("hauling-time").innerText = "Hauling Time: " + data.time_spent.Hauling + " sec";
-                    document.getElementById("unloading-time").innerText = "Unloading Time: " + data.time_spent.Unloading + " sec";
-                    document.getElementById("idling-time").innerText = "Idling Time: " + data.time_spent.Idling + " sec";
-                });
-        }
+        function sendData() {
+            let formData = {};
+            document.querySelectorAll("input").forEach(input => {
+                formData[input.name] = parseFloat(input.value);
+            });
 
-        setInterval(fetchPrediction, 5000);  // Refresh data every 5 seconds
+            fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("result").innerText = "Predicted Activity: " + data.activity;
+            });
+        }
     </script>
 </head>
 <body>
     <h1>Truck Activity Prediction</h1>
-    <h2 id="activity">Current Activity: Waiting</h2>
-    <h3 id="loading-time">Loading Time: 0 sec</h3>
-    <h3 id="hauling-time">Hauling Time: 0 sec</h3>
-    <h3 id="unloading-time">Unloading Time: 0 sec</h3>
-    <h3 id="idling-time">Idling Time: 0 sec</h3>
+    <form onsubmit="event.preventDefault(); sendData();">
+        <label for="feature1">Feature 1:</label>
+        <input type="number" id="feature1" name="feature1" required><br><br>
+
+        <label for="feature2">Feature 2:</label>
+        <input type="number" id="feature2" name="feature2" required><br><br>
+
+        <label for="feature3">Feature 3:</label>
+        <input type="number" id="feature3" name="feature3" required><br><br>
+
+        <button type="submit">Predict</button>
+    </form>
+
+    <h2 id="result">Predicted Activity: </h2>
 </body>
 </html>
